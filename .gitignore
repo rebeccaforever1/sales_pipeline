@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+logs/
+dbt/target/
+dbt/dbt_modules/
+postgres_data/
+*.log
+.DS_Store

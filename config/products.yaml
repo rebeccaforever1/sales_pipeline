@@ -1,0 +1,54 @@
+# Product catalog - add/remove products here without code changes
+# Matches the sample CSV product names and prices
+
+products:
+  - product_id: PRD-001
+    name: "Laptop Ultra X1"
+    price: 1299.99
+    category: "Computing"
+    cost: 900.00
+    supplier: "TechSupply Co"
+    
+  - product_id: PRD-002
+    name: "Desktop PC Gaming"
+    price: 1499.99
+    category: "Computing"
+    cost: 1100.00
+    supplier: "GameHardware Inc"
+    
+  - product_id: PRD-003
+    name: "Smartphone X12"
+    price: 799.99
+    category: "Mobile"
+    cost: 500.00
+    supplier: "MobileTech"
+    
+  - product_id: PRD-004
+    name: "Tablet Pro"
+    price: 649.99
+    category: "Mobile"
+    cost: 400.00
+    supplier: "MobileTech"
+    
+  - product_id: PRD-005
+    name: "Wireless Headphones"
+    price: 89.99
+    category: "Audio"
+    cost: 45.00
+    supplier: "AudioBrands"
+    
+  - product_id: PRD-006
+    name: "Bluetooth Speaker"
+    price: 129.99
+    category: "Audio"
+    cost: 65.00
+    supplier: "AudioBrands"
+    
+  - product_id: PRD-007
+    name: "Monitor, 27-inch"
+    price: 349.99
+    category: "Peripherals"
+    cost: 200.00
+    supplier: "DisplayWorks"
+    
+  - product_id: PRD-

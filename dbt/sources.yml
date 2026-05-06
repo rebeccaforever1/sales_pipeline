@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: staging
+    database: sales_db
+    schema: public
+    tables:
+      - name: staging_sales
+        description: "Raw sales data cleaned by Python ETL"
+        loaded_at_field: loaded_at
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: transaction_id
+            description: "Unique transaction identifier"
+            tests:
+              - unique
+              - not_null
+          - name: net_revenue
+            description: "Revenue after discounts"
+            tests:
+              - not_null

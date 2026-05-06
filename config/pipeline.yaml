@@ -1,0 +1,51 @@
+# Pipeline configuration pointing to your existing CSV
+pipeline:
+  name: "Sales Data Pipeline"
+  version: "2.0.0"
+
+sources:
+  primary:
+    type: "csv"
+    # Local development path
+    local_path: "C:\\Users\\rebec\\Documents\\demo\\sales_data.csv"
+    # GitHub fallback (after you push)
+    github_raw: "https://raw.githubusercontent.com/rebeccaforever1/sales_pipeline/main/data/raw/sales_data.csv"
+    # Relative path for Docker
+    container_path: "/app/data/sales_data.csv"
+  
+  # Alternative: Use GitHub API
+  github_api:
+    repo: "rebeccaforever1/sales_pipeline"
+    branch: "main"
+    file_path: "data/raw/sales_data.csv"
+
+database:
+  connection:
+    host: "${PG_HOST:-localhost}"
+    port: "${PG_PORT:-5432}"
+    user: "${PG_USER:-sales_user}"
+    password: "${PG_PASSWORD:-sales_password}"
+    database: "${PG_DB:-sales_db}"
+  
+  staging_table: "staging_sales"
+
+quality_rules:
+  # Rules from analyzing your sample CSV
+  required_columns:
+    - date
+    - store_id
+    - product_name
+    - quantity
+    - price
+    - transaction_id
+  
+  date_formats:
+    - "%Y-%m-%d"
+    - "%m/%d/%Y"
+    - "%Y/%m/%d"
+    - "%m-%d-%Y"
+    - "%d-%m-%Y"
+    - "%d/%m/%Y"
+    - "%d.%m.%Y"
+  
+  store_id_pattern: "STORE_\\d{3}"

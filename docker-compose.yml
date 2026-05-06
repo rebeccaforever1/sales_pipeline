@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: sales_postgres
+    environment:
+      POSTGRES_USER: sales_user
+      POSTGRES_PASSWORD: sales_password
+      POSTGRES_DB: sales_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sales_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dbt:
+    build:
+      context: .
+      dockerfile: Dockerfile.dbt
+    container_name: sales_dbt
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PG_HOST: postgres
+      PG_USER: sales_user
+      PG_PASSWORD: sales_password
+      PG_DB: sales_db
+    volumes:
+      - ./dbt:/app/dbt
+    working_dir: /app/dbt
+    command: ["sleep", "infinity"]
+
+volumes:
+  postgres_data:
