@@ -1,4 +1,4 @@
-# Sales Data Pipeline - Professional Implementation
+# Sales Data Pipeline - Implementation
 
 ## Overview
 Data pipeline to generate synthetic sales data, load to PostgreSQL, and transform via dBT.
