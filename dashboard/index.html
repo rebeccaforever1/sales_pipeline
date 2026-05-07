@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Pipeline</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #f7f5f0;
+    --surface: #ffffff;
+    --border:  #e2ddd6;
+    --ink:     #1a1a1a;
+    --muted:   #6b6b6b;
+    --accent:  #d4501a;
+    --green:   #1a7a4a;
+    --blue:    #1a4a8a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--ink);
+    color: #fff;
+    padding: 2rem 3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .header-sub {
+    font-size: 0.7rem;
+    color: #888;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 0.4rem;
+  }
+
+  .header-right {
+    text-align: right;
+    font-size: 0.7rem;
+    color: #888;
+    letter-spacing: 0.08em;
+  }
+
+  .status-pill {
+    display: inline-block;
+    background: var(--green);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    margin-bottom: 0.4rem;
+  }
+
+  /* MAIN */
+  main { padding: 2rem 3rem; max-width: 1400px; margin: 0 auto; }
+
+  /* KPI ROW */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+
+  .kpi {
+    padding: 1.5rem;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+  }
+
+  .kpi:last-child { border-right: none; }
+
+  .kpi::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .kpi:nth-child(1)::after { background: var(--accent); }
+  .kpi:nth-child(2)::after { background: var(--blue); }
+  .kpi:nth-child(3)::after { background: var(--green); }
+  .kpi:nth-child(4)::after { background: #8b4a1a; }
+
+  .kpi-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .kpi-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  .kpi-sub {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+  }
+
+  /* GRID */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .grid-equal {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .card-tag {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border);
+  }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; }
+
+  th {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  td {
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--ink);
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  .tag-success {
+    display: inline-block;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.4rem;
+  }
+
+  .tag-fail {
+    display: inline-block;
+    background: #fee2e2;
+    color: #991b1b;
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.4rem;
+  }
+
+  /* FOOTER */
+  footer {
+    background: var(--ink);
+    color: #555;
+    padding: 1.2rem 3rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Sales Pipeline</h1>
+    <div class="header-sub">Analytics Dashboard &middot; Jan &ndash; Mar 2023</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">&#9679; Pipeline Healthy</div>
+    <div>PostgreSQL &rarr; dbt &rarr; 3 Models</div>
+    <div style="margin-top:0.2rem">17 tests passing &middot; 43 rows loaded</div>
+  </div>
+</div>
+
+<main>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value" id="kpi-revenue">--</div>
+      <div class="kpi-sub">Net after discounts</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Transactions</div>
+      <div class="kpi-value" id="kpi-transactions">--</div>
+      <div class="kpi-sub">Clean rows loaded</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Rejected Rows</div>
+      <div class="kpi-value" id="kpi-rejected">--</div>
+      <div class="kpi-sub">Failed validation</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Pipeline Runs</div>
+      <div class="kpi-value" id="kpi-runs">--</div>
+      <div class="kpi-sub">All successful</div>
+    </div>
+  </div>
+
+  <!-- Trend + Region -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Daily Revenue Trend</span>
+        <span class="card-tag">mart_daily_sales</span>
+      </div>
+      <canvas id="trendChart" height="120"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Revenue by Region</span>
+        <span class="card-tag">mart_daily_sales</span>
+      </div>
+      <canvas id="regionChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- Products + Store -->
+  <div class="grid-equal">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Top Products</span>
+        <span class="card-tag">stg_sales</span>
+      </div>
+      <canvas id="productChart" height="180"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Revenue by Store</span>
+        <span class="card-tag">mart_daily_sales</span>
+      </div>
+      <canvas id="storeChart" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- Pipeline runs table -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Pipeline Run History</span>
+      <span class="card-tag">audit.pipeline_runs_v2</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Run At</th>
+          <th>Duration</th>
+          <th>Rows Loaded</th>
+          <th>Rows Rejected</th>
+          <th>Models Passed</th>
+          <th>Tests Passed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="runs-table"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<footer>
+  <span>CSV &rarr; Python ETL &rarr; PostgreSQL &rarr; dbt Staging &rarr; dbt Intermediate &rarr; dbt Marts &rarr; Dashboard</span>
+  <span>Data: Jan&ndash;Mar 2023 &middot; 3 Stores &middot; 15 Products</span>
+</footer>
+
+<script>
+Chart.defaults.font.family = 'Inter, sans-serif';
+Chart.defaults.font.size = 11;
+Chart.defaults.color = '#6b6b6b';
+
+const COLORS = ['#d4501a','#1a4a8a','#1a7a4a','#8b4a1a','#4a1a8a','#1a6a7a','#7a1a4a','#4a7a1a'];
+
+fetch('data.json')
+  .then(r => r.json())
+  .then(data => {
+
+    // KPIs
+    document.getElementById('kpi-revenue').textContent =
+      '$' + Number(data.summary.total_revenue).toLocaleString('en-US', {minimumFractionDigits:2});
+    document.getElementById('kpi-transactions').textContent =
+      Number(data.summary.total_transactions).toLocaleString();
+    document.getElementById('kpi-rejected').textContent =
+      data.summary.rejected_rows;
+    document.getElementById('kpi-runs').textContent =
+      data.pipeline_runs.length;
+
+    // Trend
+    new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: {
+        labels: Object.keys(data.daily),
+        datasets: [{
+          data: Object.values(data.daily),
+          borderColor: '#d4501a',
+          backgroundColor: 'rgba(212,80,26,0.06)',
+          borderWidth: 2,
+          pointRadius: 2,
+          pointBackgroundColor: '#d4501a',
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: '#f0ede6' }, ticks: { maxTicksLimit: 10, maxRotation: 45 } },
+          y: { grid: { color: '#f0ede6' }, ticks: { callback: v => '$' + v.toLocaleString() } }
+        }
+      }
+    });
+
+    // Region donut
+    new Chart(document.getElementById('regionChart'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(data.region),
+        datasets: [{
+          data: Object.values(data.region),
+          backgroundColor: COLORS,
+          borderColor: '#fff',
+          borderWidth: 3
+        }]
+      },
+      options: {
+        cutout: '55%',
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10 } }
+        }
+      }
+    });
+
+    // Products horizontal bar
+    new Chart(document.getElementById('productChart'), {
+      type: 'bar',
+      data: {
+        labels: Object.keys(data.products),
+        datasets: [{
+          data: Object.values(data.products),
+          backgroundColor: COLORS,
+          borderRadius: 2
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: '#f0ede6' }, ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'k' } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+
+    // Store bar
+    new Chart(document.getElementById('storeChart'), {
+      type: 'bar',
+      data: {
+        labels: Object.keys(data.store),
+        datasets: [{
+          data: Object.values(data.store),
+          backgroundColor: ['#d4501a','#1a4a8a','#1a7a4a'],
+          borderRadius: 2
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: '#f0ede6' }, ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'k' } }
+        }
+      }
+    });
+
+    // Runs table
+    const tbody = document.getElementById('runs-table');
+    data.pipeline_runs.forEach(r => {
+      const statusTag = r.status === 'success'
+        ? '<span class="tag-success">success</span>'
+        : '<span class="tag-fail">failed</span>';
+      tbody.innerHTML +=
+        '<tr>' +
+        '<td>' + r.run_at.split('.')[0] + '</td>' +
+        '<td>' + r.duration + 's</td>' +
+        '<td>' + r.rows_loaded + '</td>' +
+        '<td>' + r.rows_rejected + '</td>' +
+        '<td>' + r.models_passed + '</td>' +
+        '<td>' + r.tests_passed + '</td>' +
+        '<td>' + statusTag + '</td>' +
+        '</tr>';
+    });
+  })
+  .catch(() => {
+    document.querySelector('main').innerHTML =
+      '<div style="padding:3rem;text-align:center;color:#d4501a">Could not load data.json — run: python dashboard/export_data.py</div>';
+  });
+</script>
+</body>
+</html>
+"@ | Out-File -FilePath dashboard\index.html -Encoding ascii

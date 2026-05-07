@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: stg_sales
+    description: Staging view of raw sales data loaded by the Python ETL
+    columns:
+      - name: transaction_id
+        description: Unique transaction identifier
+      - name: sale_date
+        description: Date the sale occurred
+        tests:
+          - not_null
+      - name: store_id
+        description: Normalised store identifier
+        tests:
+          - not_null
+      - name: product_name
+        description: Name of the product sold
+        tests:
+          - not_null
+      - name: quantity
+        description: Units sold
+        tests:
+          - not_null
+      - name: unit_price
+        description: Price per unit
+        tests:
+          - not_null
+      - name: revenue
+        description: Net revenue after discount
+        tests:
+          - not_null
+      - name: region
+        description: Geographic region
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['West', 'East', 'South', 'North', 'Central', 'North East', 'South East', 'North West']
+
+  - name: int_sales_enriched
+    description: Enriched sales data with product categories, price tiers and time dimensions
+    columns:
+      - name: product_category
+        description: Business category assigned to each product
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Computers', 'Mobile', 'Audio', 'Storage', 'Displays', 'Accessories']
+      - name: price_tier
+        description: Price tier based on unit price
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Premium', 'Mid-Range', 'Standard', 'Budget']
+      - name: is_discounted
+        description: True if a discount was applied
+        tests:
+          - not_null
+
+  - name: daily_sales_metrics
+    description: Daily aggregated sales metrics per store and region
+    columns:
+      - name: sale_date
+        description: The date of the aggregated sales
+        tests:
+          - not_null
+      - name: store_id
+        description: Store identifier
+        tests:
+          - not_null
+      - name: total_net_revenue
+        description: Total revenue after discounts for this day and store
+        tests:
+          - not_null
+      - name: transaction_count
+        description: Number of transactions
+        tests:
+          - not_null
