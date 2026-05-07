@@ -1,7 +1,7 @@
 # Sales Data Pipeline - Implementation
 
 ## Overview
-Data pipeline to generate synthetic sales data, load to PostgreSQL, and transform via dBT.
+Data pipeline to read CSV containing messy sales data, load to PostgreSQL, and transform via dBT.
 
 
 
