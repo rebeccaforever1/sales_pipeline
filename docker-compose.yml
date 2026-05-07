@@ -1,5 +1,5 @@
+# docker-compose.yml
 version: '3.8'
-
 services:
   postgres:
     image: postgres:15
@@ -18,14 +18,29 @@ services:
       timeout: 5s
       retries: 5
 
+  etl:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: sales_etl
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: sales_user
+      DB_PASSWORD: sales_password
+      DB_NAME: sales_db
+      CSV_FILE: /app/data/sales_data.csv
+    volumes:
+      - ./data/raw:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   dbt:
     build:
       context: .
       dockerfile: Dockerfile.dbt
     container_name: sales_dbt
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       PG_HOST: postgres
       PG_USER: sales_user
@@ -34,7 +49,9 @@ services:
     volumes:
       - ./dbt:/app/dbt
     working_dir: /app/dbt
-    command: ["sleep", "infinity"]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

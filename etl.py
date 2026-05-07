@@ -1,263 +1,183 @@
-#!/usr/bin/env python3
-"""
-ETL Pipeline - Synthetic Data Generation and Loading
-Generates sales data matching the sample CSV patterns and loads to PostgreSQL
-"""
-
-import pandas as pd
-import numpy as np
-import psycopg2
-from sqlalchemy import create_engine
 import os
+import re
 import logging
 import sys
-from datetime import datetime, timedelta
-import random
-from faker import Faker
+from datetime import datetime
+from pathlib import Path
 
-# Setup logging
+import pandas as pd
+from dateutil import parser as dateutil_parser
+from sqlalchemy import create_engine, text
+
+# Logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-# Initialize Faker for realistic data
-fake = Faker()
-np.random.seed(42)
-random.seed(42)
+# Config
+DB_HOST     = os.getenv("DB_HOST", "localhost")
+DB_PORT     = os.getenv("DB_PORT", "5432")
+DB_USER     = os.getenv("DB_USER", "sales_user")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "sales_password")
+DB_NAME     = os.getenv("DB_NAME", "sales_db")
+CSV_FILE    = os.getenv("CSV_FILE", "/app/data/sales_data.csv")
+DB_URL      = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-# Product catalog (matching your sample CSV)
-PRODUCT_CATALOG = {
-    'Laptop Ultra X1': {'price': 1299.99, 'category': 'Computing'},
-    'Desktop PC Gaming': {'price': 1499.99, 'category': 'Computing'},
-    'Smartphone X12': {'price': 799.99, 'category': 'Mobile'},
-    'Tablet Pro': {'price': 649.99, 'category': 'Mobile'},
-    'Wireless Headphones': {'price': 89.99, 'category': 'Audio'},
-    'Bluetooth Speaker': {'price': 129.99, 'category': 'Audio'},
-    'Monitor, 27-inch': {'price': 349.99, 'category': 'Peripherals'},
-    'Wireless Mouse': {'price': 49.99, 'category': 'Peripherals'},
-    'External SSD 1TB': {'price': 159.99, 'category': 'Storage'},
-    'USB-C Cable 2m': {'price': 19.99, 'category': 'Accessories'},
-    'Laptop Stand': {'price': 29.99, 'category': 'Accessories'},
-    'Wireless Keyboard': {'price': 79.99, 'category': 'Peripherals'},
-    'Power Bank 20000mAh': {'price': 59.99, 'category': 'Accessories'},
-    'Smart Watch Series 7': {'price': 299.99, 'category': 'Wearables'},
-    'Airpods Pro': {'price': 249.99, 'category': 'Audio'}
-}
+def normalize_store_id(raw):
+    if pd.isna(raw): return None
+    s = str(raw).strip().upper()
+    digits = re.search(r"\d+", s)
+    if digits:
+        return f"STORE_{digits.group().zfill(3)}"
+    return s
 
-# Store configuration (6 stores across regions)
-STORES = [
-    {'store_id': 'STORE_005', 'region': 'West'},
-    {'store_id': 'STORE_006', 'region': 'East'},
-    {'store_id': 'STORE_007', 'region': 'South'},
-    {'store_id': 'STORE_008', 'region': 'North'},
-    {'store_id': 'STORE_009', 'region': 'Central'},
-    {'store_id': 'STORE_010', 'region': 'West'}
-]
+def normalize_region(raw):
+    if pd.isna(raw): return None
+    return str(raw).strip().title()
 
-# Customer types (from your sample)
-CUSTOMER_TYPES = ['Regular', 'Premium', 'Enterprise', 'RegularCustomer']
-CUSTOMER_TYPE_MAP = {'RegularCustomer': 'Regular'}  # Normalize later
+def parse_date(raw):
+    if pd.isna(raw): return None
+    try:
+        return dateutil_parser.parse(str(raw).strip(), dayfirst=False)
+    except:
+        return None
 
-# Payment methods (from your sample)
-PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'Cash', 'Apple Pay', 'PayPal']
+def parse_price(raw):
+    if pd.isna(raw): return None
+    cleaned = str(raw).strip().replace("$", "").replace(",", "")
+    try:
+        return float(cleaned)
+    except:
+        return None
 
+def parse_discount(raw):
+    if pd.isna(raw): return 0.0
+    s = str(raw).strip()
+    if s == "": return 0.0
+    if "%" in s:
+        try:
+            return float(s.replace("%", "")) / 100.0
+        except:
+            return 0.0
+    try:
+        val = float(s)
+        return val / 100.0 if val > 1 else val
+    except:
+        return 0.0
 
-def generate_sales_data(num_rows=5000):
-    """Generate synthetic sales data matching sample patterns"""
-    
-    logger.info(f"Generating {num_rows} synthetic sales records")
-    
-    data = []
-    
-    for i in range(num_rows):
-        # Generate random date within last year
-        days_ago = random.randint(0, 365)
-        sale_date = datetime.now() - timedelta(days=days_ago)
-        
-        # Select random store
-        store = random.choice(STORES)
-        
-        # Select random product
-        product_name = random.choice(list(PRODUCT_CATALOG.keys()))
-        product = PRODUCT_CATALOG[product_name]
-        
-        # Quantity (weighted toward small orders)
-        quantity = random.choices(
-            [1, 2, 3, 4, 5, 10],
-            weights=[0.4, 0.3, 0.15, 0.08, 0.05, 0.02]
-        )[0]
-        
-        # Discount (mostly 0, occasional promotions)
-        discount = random.choices(
-            [0, 0.05, 0.10, 0.15, 0.20],
-            weights=[0.6, 0.2, 0.12, 0.05, 0.03]
-        )[0]
-        
-        # Customer type
-        customer_type_raw = random.choices(
-            CUSTOMER_TYPES,
-            weights=[0.6, 0.25, 0.1, 0.05]
-        )[0]
-        
-        # Normalize customer type
-        customer_type = CUSTOMER_TYPE_MAP.get(customer_type_raw, customer_type_raw)
-        
-        # Payment method
-        payment_method = random.choice(PAYMENT_METHODS)
-        
-        # Generate transaction ID
-        transaction_id = f"TRX-{100000 + i:06d}"
-        
-        # Calculate derived fields
-        gross_revenue = quantity * product['price']
-        discount_amount = gross_revenue * discount
-        net_revenue = gross_revenue - discount_amount
-        
-        data.append({
-            'transaction_id': transaction_id,
-            'sale_date': sale_date,
-            'store_id': store['store_id'],
-            'region': store['region'],
-            'product_name': product_name,
-            'category': product['category'],
-            'quantity': quantity,
-            'unit_price': product['price'],
-            'discount_rate': discount,
-            'gross_revenue': gross_revenue,
-            'discount_amount': discount_amount,
-            'net_revenue': net_revenue,
-            'customer_type': customer_type,
-            'payment_method': payment_method
-        })
-    
-    df = pd.DataFrame(data)
-    
-    # Introduce some data quality issues (like the real CSV)
-    # Add 2% rows with issues to test validation
-    issue_indices = np.random.choice(df.index, size=int(len(df) * 0.02), replace=False)
-    
-    for idx in issue_indices:
-        issue_type = random.choice(['null_transaction', 'zero_quantity', 'null_price'])
-        if issue_type == 'null_transaction':
-            df.at[idx, 'transaction_id'] = None
-        elif issue_type == 'zero_quantity':
-            df.at[idx, 'quantity'] = 0
-        else:
-            df.at[idx, 'unit_price'] = None
-    
-    logger.info(f"Generated {len(df)} rows (including {len(issue_indices)} test issues)")
-    
+def normalize_customer_type(raw):
+    if pd.isna(raw): return "Unknown"
+    s = str(raw).strip()
+    mapping = {
+        "regular": "Regular",
+        "regularcustomer": "Regular",
+        "premium": "Premium",
+        "premier": "Premier",
+    }
+    return mapping.get(s.lower(), s)
+
+def normalize_payment(raw):
+    if pd.isna(raw) or str(raw).strip() == "": return None
+    s = str(raw).strip()
+    if s.lower() == "debit": return "Debit Card"
+    return s
+
+def extract(csv_path):
+    log.info(f"Reading CSV from {csv_path}")
+    if not Path(csv_path).exists():
+        log.error(f"CSV not found: {csv_path}")
+        sys.exit(1)
+    df = pd.read_csv(csv_path, dtype=str, skipinitialspace=True)
+    df.columns = (df.columns.str.strip().str.lower()
+                  .str.replace(r"[\s%]+", "_", regex=True)
+                  .str.replace(r"[^a-z0-9_]", "", regex=True))
+    log.info(f"Loaded {len(df)} rows")
     return df
 
+def transform(df):
+    log.info("Cleaning data...")
+    rows_clean, rows_rejected = [], []
 
-def clean_and_validate(df):
-    """Clean data and filter invalid records"""
-    
-    original_count = len(df)
-    
-    # Filter invalid records
-    valid_mask = (
-        df['transaction_id'].notna() &
-        (df['quantity'] > 0) &
-        df['unit_price'].notna() &
-        (df['unit_price'] > 0)
-    )
-    
-    df_clean = df[valid_mask].copy()
-    rejected_count = original_count - len(df_clean)
-    
-    if rejected_count > 0:
-        logger.warning(f"Rejected {rejected_count} rows with data quality issues")
-        
-        # Log sample of rejected rows for debugging
-        rejected_sample = df[~valid_mask].head(3)
-        for idx, row in rejected_sample.iterrows():
-            logger.warning(f"  Rejected row: {row.get('transaction_id', 'NO_ID')} - quantity={row.get('quantity')}, price={row.get('unit_price')}")
-    
-    # Add loaded_at timestamp
-    df_clean['loaded_at'] = datetime.now()
-    
-    logger.info(f"Clean data: {len(df_clean)} rows ready for loading")
-    
-    return df_clean
+    for idx, row in df.iterrows():
+        reasons = []
+        parsed_date   = parse_date(row.get("date"))
+        store_id      = normalize_store_id(row.get("store_id"))
+        product_name  = str(row.get("product_name", "")).strip() if pd.notna(row.get("product_name")) else None
+        customer_type = normalize_customer_type(row.get("customer_type"))
+        payment       = normalize_payment(row.get("payment_method"))
+        region        = normalize_region(row.get("region"))
+        transaction_id= str(row.get("transaction_id", "")).strip() if pd.notna(row.get("transaction_id")) else None
+        price         = parse_price(row.get("price"))
+        discount      = parse_discount(row.get("discount_"))
 
+        raw_qty = row.get("quantity", "")
+        try:
+            quantity = int(float(str(raw_qty).strip())) if pd.notna(raw_qty) and str(raw_qty).strip() != "" else None
+        except:
+            quantity = None
 
-def load_to_postgres(df):
-    """Load cleaned data to PostgreSQL staging table"""
-    
-    # Get connection parameters from environment
-    pg_host = os.environ.get('PG_HOST', 'localhost')
-    pg_user = os.environ.get('PG_USER', 'sales_user')
-    pg_pass = os.environ.get('PG_PASSWORD', 'sales_password')
-    pg_db = os.environ.get('PG_DB', 'sales_db')
-    
-    connection_string = f"postgresql://{pg_user}:{pg_pass}@{pg_host}:5432/{pg_db}"
-    engine = create_engine(connection_string)
-    
-    # Create staging table if not exists
-    create_table_sql = """
-    CREATE TABLE IF NOT EXISTS staging_sales (
-        id SERIAL PRIMARY KEY,
-        transaction_id VARCHAR(50),
-        sale_date TIMESTAMP,
-        store_id VARCHAR(20),
-        region VARCHAR(50),
-        product_name VARCHAR(200),
-        category VARCHAR(100),
-        quantity INTEGER,
-        unit_price DECIMAL(10,2),
-        discount_rate DECIMAL(5,4),
-        gross_revenue DECIMAL(12,2),
-        discount_amount DECIMAL(12,2),
-        net_revenue DECIMAL(12,2),
-        customer_type VARCHAR(50),
-        payment_method VARCHAR(50),
-        loaded_at TIMESTAMP
-    )
-    """
-    
-    with engine.connect() as conn:
-        conn.execute(create_table_sql)
-        conn.commit()
-    
-    # Load data (replace existing for idempotency)
-    df.to_sql('staging_sales', engine, if_exists='replace', index=False)
-    
-    # Verify load
-    with engine.connect() as conn:
-        result = conn.execute("SELECT COUNT(*) FROM staging_sales")
-        count = result.scalar()
-        logger.info(f"Successfully loaded {count} records to staging_sales")
-    
-    engine.dispose()
+        if parsed_date is None: reasons.append("unparseable date")
+        if price is None:       reasons.append("missing or invalid price")
+        elif price <= 0:        reasons.append("price must be positive")
+        if quantity is None:    reasons.append("missing quantity")
+        elif quantity < 1:      reasons.append("quantity less than 1")
+        if not product_name:    reasons.append("missing product name")
 
+        if reasons:
+            rows_rejected.append({**row.to_dict(), "rejection_reason": "; ".join(reasons), "loaded_at": datetime.utcnow()})
+        else:
+            revenue = round(price * quantity * (1 - (discount or 0.0)), 2)
+            rows_clean.append({
+                "transaction_id": transaction_id,
+                "sale_date":      parsed_date.date(),
+                "store_id":       store_id,
+                "product_name":   product_name,
+                "quantity":       quantity,
+                "unit_price":     price,
+                "discount_pct":   discount or 0.0,
+                "revenue":        revenue,
+                "customer_type":  customer_type,
+                "payment_method": payment,
+                "region":         region,
+                "loaded_at":      datetime.utcnow(),
+            })
+
+    log.info(f"{len(rows_clean)} rows clean, {len(rows_rejected)} rejected")
+    return pd.DataFrame(rows_clean), pd.DataFrame(rows_rejected)
+
+def load(df_clean, df_rejected, db_url):
+    log.info("Connecting to PostgreSQL...")
+    engine = create_engine(db_url)
+    with engine.begin() as conn:
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS raw_data"))
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS audit"))
+    if not df_clean.empty:
+        df_clean.to_sql("stg_sales", engine, schema="raw_data", if_exists="replace", index=False)
+        log.info("Loaded stg_sales")
+    if not df_rejected.empty:
+        df_rejected.to_sql("rejected_rows", engine, schema="audit", if_exists="replace", index=False)
+        log.info("Loaded rejected_rows")
+    pd.DataFrame([{
+        "run_at": datetime.utcnow(),
+        "rows_loaded": len(df_clean),
+        "rows_rejected": len(df_rejected),
+        "status": "success"
+    }]).to_sql("pipeline_runs", engine, schema="audit", if_exists="append", index=False)
 
 def main():
-    """Main ETL pipeline"""
-    logger.info("=" * 50)
-    logger.info("Starting ETL Pipeline")
-    logger.info("=" * 50)
-    
+    log.info("ETL started")
     try:
-        # Generate synthetic data
-        df_raw = generate_sales_data(num_rows=5000)
-        
-        # Clean and validate
-        df_clean = clean_and_validate(df_raw)
-        
-        # Load to PostgreSQL
-        load_to_postgres(df_clean)
-        
-        logger.info("=" * 50)
-        logger.info("ETL Pipeline completed successfully")
-        logger.info("=" * 50)
-        
+        raw = extract(CSV_FILE)
+        clean, rejected = transform(raw)
+        load(clean, rejected, DB_URL)
+        log.info("ETL completed successfully")
+        sys.exit(0)
     except Exception as e:
-        logger.error(f"ETL Pipeline failed: {e}")
+        log.exception(f"ETL failed: {e}")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
